@@ -5,39 +5,45 @@ import Source._
 
 import scala.util.Random
 
-sealed trait Box[A] { self =>
+sealed trait Box[A] {
+  self =>
   def *>[B](that: Box[B]): Box[B] = self.flatMap((_: A) => that)
 
   def map[B](f: A -=> B): Box[B] = self.flatMap(f andThen Box.succeed)
 
-//  private def flatMap[B](f: A => Box[B]): Box[B] = Box.FlatMap(self, f)
   def flatMap[B](f: A -=> Box[B]): Box[B] = Box.FlatMap(self, f)
 
   def zip[B](that: Box[B]): Box[(A, B)] = self.flatMap((a: A) => that.map((b: B) => (a, b)))
 }
 
-case class TracedFunction0[+A](f: () => A)(implicit val debugInfo: DebugInfo) extends (() => A) {
-  override def apply(): A = f()
+trait Debug {
+  val debugInfo: DebugInfo
 }
 
-case class -=>[-A, +B](f: A => B)(implicit val debugInfo: DebugInfo) extends (A => B) {
+abstract class -=>[-A, +B](f: A => B) extends (A => B) with Debug {
+
   override def apply(a: A): B = f(a)
 
-  override def andThen[C](g: B => C): A -=> C = -=>(f.andThen(g))(debugInfo)
 }
 
 object -=> {
-  implicit def f2tf[A, B](fab: A => B)(implicit debugInfo: DebugInfo): A -=> B =
-    -=>(fab)(debugInfo)
+  implicit def f2tf[A, B](f: A => B): A -=> B = new -=>[A, B](f) {
+    override lazy val debugInfo: DebugInfo = Source.debug(f)
+  }
+}
 
+abstract class TracedFunction0[+A](f: () => A) extends (() => A) with Debug {
+  override def apply(): A = f()
 }
 
 object TracedFunction0 {
-  implicit def f2tf[A](fab: () => A)(implicit debugInfo: DebugInfo): TracedFunction0[A] =
-    TracedFunction0(fab)(debugInfo)
+  implicit def f2tf0[A](f: () => A): TracedFunction0[A] = new TracedFunction0(f) {
+    override val debugInfo: DebugInfo = Source.debug(f)
+  }
 
-  implicit def wtf[A](fab: => A)(implicit debugInfo: DebugInfo): TracedFunction0[A] =
-    TracedFunction0(() => fab)(debugInfo)
+  implicit def bn2tf0[A](a: => A): TracedFunction0[A] = new TracedFunction0(a) {
+    override val debugInfo: DebugInfo = Source.debug(a)
+  }
 }
 
 object Box {
@@ -50,7 +56,7 @@ object Box {
   def run[A](box: Box[A]): A = box match {
     case Succeed(value) => value
     case EffectTotal(effect) =>
-      println(s"Effect Total: ${effect.debugInfo}")
+      println(s"Effect Total: ${effect}")
       effect()
     case FlatMap(box, f) =>
       println(s"FlatMap: ${f.debugInfo}")
