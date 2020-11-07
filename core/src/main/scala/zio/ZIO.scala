@@ -16,36 +16,6 @@ sealed trait Box[A] {
   def zip[B](that: Box[B]): Box[(A, B)] = self.flatMap((a: A) => that.map((b: B) => (a, b)))
 }
 
-trait Debug {
-  val debugInfo: DebugInfo
-}
-
-abstract class -=>[-A, +B](f: A => B) extends (A => B) with Debug {
-
-  override def apply(a: A): B = f(a)
-
-}
-
-object -=> {
-  implicit def f2tf[A, B](f: A => B): A -=> B = new -=>[A, B](f) {
-    override lazy val debugInfo: DebugInfo = Source.debug(f)
-  }
-}
-
-abstract class TracedFunction0[+A](f: () => A) extends (() => A) with Debug {
-  override def apply(): A = f()
-}
-
-object TracedFunction0 {
-  implicit def f2tf0[A](f: () => A): TracedFunction0[A] = new TracedFunction0(f) {
-    override val debugInfo: DebugInfo = Source.debug(f)
-  }
-
-  implicit def bn2tf0[A](a: => A): TracedFunction0[A] = new TracedFunction0(a) {
-    override val debugInfo: DebugInfo = Source.debug(a)
-  }
-}
-
 object Box {
   def succeed[A](value: A): Box[A] = Box.Succeed(value)
 
