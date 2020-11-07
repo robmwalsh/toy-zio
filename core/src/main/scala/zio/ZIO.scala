@@ -1,19 +1,20 @@
 package zio
 
-import macros._
-import Source._
+import tracemacros.-=>.TFn0
+import tracemacros._
+import tracemacros.Traced.DebugInfo
 
 import scala.util.Random
 
 sealed trait Box[A] {
   self =>
-  def *>[B](that: Box[B]): Box[B] = self.flatMap((_: A) => that)
+  def *>[B](that: Box[B]): Box[B] = self.flatMap(_ => that)
 
   def map[B](f: A -=> B): Box[B] = self.flatMap(f andThen Box.succeed)
 
   def flatMap[B](f: A -=> Box[B]): Box[B] = Box.FlatMap(self, f)
 
-  def zip[B](that: Box[B]): Box[(A, B)] = self.flatMap((a: A) => that.map((b: B) => (a, b)))
+  def zip[B](that: Box[B]): Box[(A, B)] = self.flatMap(a => that.map(b => (a, b)))
 }
 
 object Box {
@@ -21,7 +22,7 @@ object Box {
 
   private def apply[A](effect: => A): Box[A] = Box.EffectTotal(() => effect)
 
-  def apply[A](effect: TracedFunction0[A]): Box[A] = Box.EffectTotal(effect)
+  def apply[A](effect: TFn0[A]): Box[A] = Box.EffectTotal(effect)
 
   def run[A](box: Box[A]): A = box match {
     case Succeed(value) => value
@@ -37,7 +38,7 @@ object Box {
 
   case class Succeed[A](value: A) extends Box[A]
 
-  case class EffectTotal[A](effect: TracedFunction0[A]) extends Box[A]
+  case class EffectTotal[A](effect: TFn0[A]) extends Box[A]
 }
 
 object Example {
